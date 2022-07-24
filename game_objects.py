@@ -4,7 +4,6 @@ import math
 from pygame.math import *
 from utils import *
 from pygame.constants import *
-from config import *
 
 glow_radius = 8
 glow_step = 1

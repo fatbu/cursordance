@@ -10,7 +10,6 @@ import random
 import pygame_textinput
 from pydub import AudioSegment
 from utils import *
-from config import *
 from os import path
 import sys
 import os
