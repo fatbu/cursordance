@@ -183,9 +183,9 @@ class MapScene(BaseScene):
         if file_path == None:
             file_path = prompt_file()
             if len(file_path) == 0:
-                self.next = BaseScene()
-                return
-        
+                pygame.quit()
+                sys.exit()
+
         self.music_file_path = ''
         self.map_file_path = ''
 
