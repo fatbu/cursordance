@@ -87,6 +87,6 @@ while True:
     #     screen.blit(cursor_trail_surf, (pos[0]-cursor_size/2, pos[1]-cursor_size/2))
     #     trail_count += 1        
 
-    pygame.display.update()
+    pygame.display.flip()
 
     clock.tick()

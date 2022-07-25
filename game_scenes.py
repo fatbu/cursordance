@@ -14,11 +14,6 @@ from os import path
 import sys
 import os
 
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
-
 cursor_size = 64
 cursor_surf = pygame.Surface((cursor_size, cursor_size))
 cursor_surf.set_colorkey((0, 0, 0))
@@ -33,6 +28,8 @@ pygame.draw.circle(cursor_trail, pygame.Color('white'), (4, 4), 4, 0)
 
 
 font_size = 32
+font_file = 'fonts/Pixolletta8px.ttf'
+
 beat_size = 128
 
 def prompt_file():
@@ -175,7 +172,7 @@ class MapScene(BaseScene):
         self.divisor = 4
         self.anglesnap = 3
         self.play_pos = 0
-        self.font = pygame.font.Font(resource_path('fonts/5.ttf'), font_size)
+        self.font = pygame.font.Font(resource_path(font_file), font_size)
         self.side_objects = []
         self.last_hit = 0
 
@@ -674,7 +671,9 @@ class PlayScene(BaseScene):
     def __init__(self, file_path):
         BaseScene.__init__(self)
 
-        self.font = pygame.font.Font(resource_path('fonts/5.ttf'), font_size)
+        self.font = pygame.font.Font(resource_path(font_file), font_size)
+
+        # pygame.mouse.set_cursor(pygame.Cursor((32, 32), cursor_surf))
 
         self.cur_pos = pygame.mouse.get_pos()
         self.last_pos = self.cur_pos
@@ -739,6 +738,7 @@ class PlayScene(BaseScene):
         return float(self.map['width'])/20
 
     def end_play(self):
+        # pygame.mouse.set_cursor(*pygame.cursors.arrow)
         pygame.mouse.set_visible(True)
 
     def break_combo(self):

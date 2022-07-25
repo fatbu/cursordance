@@ -5,7 +5,7 @@ block_cipher = None
 
 added_files = [
     ('sounds/*', 'sounds'),
-    ('fonts/*', 'fonts')
+    ('fonts/*', 'fonts'),
 ]
 
 a = Analysis(
