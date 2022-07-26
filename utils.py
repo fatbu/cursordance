@@ -16,6 +16,13 @@ def convert_pos(pos, scale):
 def convert_scalar(val, scale):
     return val*scale/2
 
+def quadscale(x):
+    if x <= 0:
+        return 0
+    if x >= 1:
+        return 1
+    return -((x-1)**2)+1
+
 def lerp(a, b, c):
     return a+(b-a)*c
      

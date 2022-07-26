@@ -91,7 +91,7 @@ class Circle(GameObject):
             self.cur_radius = self.radius
         
         if tick >= self.end_time:
-            self.fade = min(1, lerp(0, 1, (tick-self.end_time)/self.appear_time))
+            self.fade = quadscale(min(1, lerp(0, 1, (tick-self.end_time)/self.appear_time)))
         # elif tick > self.start_time and tick < self.end_time:
         #     self.cur_radius = self.radius
         # elif tick > self.end_time:
@@ -149,7 +149,7 @@ class Circle(GameObject):
             resized_surf = pygame.transform.smoothscale(self.surf, (resize_size, resize_size)).convert_alpha()
             surf_size = surf.get_height()
             darkener = pygame.Surface((surf_size, surf_size))
-            darkener.set_alpha(255-255*self.cur_radius/self.radius)
+            darkener.set_alpha(255-255*quadscale(self.cur_radius/self.radius))
             resized_surf.blit(darkener, (0, 0))
             darken_surf.blit(darkener, (0, 0))
             surf.blit(darken_surf, convert_pos(self.pos, surf_size)+Vector2(-self.surf.get_width()/2, -self.surf.get_height()/2), special_flags=blend_mode)
@@ -231,9 +231,9 @@ class Arc(GameObject):
         if self.ttl > self.lifespan/2:
 
             if self.hidden:
-                darken_value = 255*abs(self.ttl-self.lifespan*3/4)/(self.lifespan/4)
+                darken_value = 255*quadscale(abs(self.ttl-self.lifespan*3/4)/(self.lifespan/4))
             else:
-                darken_value = 255*(self.ttl-self.lifespan/2)/(self.lifespan/2)
+                darken_value = 255*quadscale((self.ttl-self.lifespan/2)/(self.lifespan/2))
 
             darken_surf = self.draw_surf.copy()
             darkener = pygame.Surface(self.draw_area.size)
@@ -371,7 +371,6 @@ class Track(GameObject):
         self.circle_surf = circle_surf
         self.circle_pos = self.start_pos
         self.circle_radius = convert_scalar(circle_radius, internal_res)
-
     def update(self, tick, map_mode = False):
         if tick < self.start_time-self.appear_time and map_mode:
             self.die()
@@ -382,14 +381,16 @@ class Track(GameObject):
         else:
             self.live()
         
-        if tick < self.start_time:
-            self.opacity = (self.start_time-tick)/self.appear_time
+
+        if tick > self.start_time - self.appear_time and tick < self.start_time:
+            self.opacity = quadscale((self.start_time-tick)/(self.appear_time))
             self.circle_pos = self.start_pos
         elif tick >= self.start_time:
-            if self.hidden:
-                self.opacity = max(0, (tick-self.start_time)/(self.end_time-self.start_time))
-            else:
-                self.opacity = 1
+            # if self.hidden:
+            #     self.opacity = max(0, (tick-self.start_time)/(self.end_time-self.start_time))
+            # else:
+                # self.opacity = 1
+            self.opacity = 1
             if self.arc_count == 1:
                 anglediff = (180+self.arc1start-self.arc1end)%360-180
                 self.circle_pos = self.arc1pos+Vector2(self.arc1radius, 0).rotate(-self.arc1start+lerp(0, anglediff, (tick-self.start_time)/(self.end_time-self.start_time)))
@@ -419,9 +420,6 @@ class Track(GameObject):
             darkener.set_alpha(255*self.opacity)
             darken_surf.blit(darkener, (0, 0))
             surf.blit(darken_surf, self.circle_pos-Vector2(darken_surf.get_size())/2, special_flags=blend_mode)
-
-            resize_darken_surf = pygame.transform.scale(darken_surf.copy(), Vector2(darken_surf.get_size())*(1-self.opacity))
-            surf.blit(resize_darken_surf, self.circle_pos-Vector2(resize_darken_surf.get_size())/2, special_flags=blend_mode)
         else:
             surf.blit(self.surf, (0, 0), special_flags=blend_mode)
             surf.blit(self.circle_surf, self.circle_pos-Vector2(self.circle_surf.get_size())/2, special_flags=blend_mode)

@@ -1,8 +1,6 @@
 from re import U
-import time
 import tkinter
 import tkinter.filedialog
-from turtle import pos
 import pygame
 from pygame.constants import *
 from game_objects import *
@@ -10,9 +8,7 @@ import random
 import pygame_textinput
 from pydub import AudioSegment
 from utils import *
-from os import path
 import sys
-import os
 
 cursor_size = 64
 cursor_surf = pygame.Surface((cursor_size, cursor_size))
@@ -320,6 +316,16 @@ class MapScene(BaseScene):
         pos = round(self.play_pos)+pygame.mixer.music.get_pos()
         return max(0, pos)
 
+    def bpm(self):
+        if 'bpm' in self.map:
+            return self.map['bpm']
+        return 120
+    
+    def offset(self):
+        if 'offset' in self.map:
+            return self.map['offset']
+        return 0
+
     def approach(self):
         return 200+float(self.map['approach'])*100
 
@@ -327,7 +333,7 @@ class MapScene(BaseScene):
         return {'good': float(self.map['precision'])*10, 'ok': float(self.map['precision'])*20}
 
     def arc_width(self):
-        return float(self.map['width'])/20
+        return float(self.map['width'])/40
 
     def get_closest_arc_index(self):
         for i, object in reversed(list(enumerate(self.map['objects']))):
@@ -338,7 +344,7 @@ class MapScene(BaseScene):
         possible_circles = []
         possible_indexes = []
         for i, object in enumerate(self.map['objects']):
-            if object['type'] == 'circle' and object['start_time'] <= self.get_pos() and self.get_pos() < object['end_time']:
+            if object['type'] == 'circle' and object['start_time'] <= self.get_pos() and self.get_pos() <= object['end_time']:
                 possible_circles.append(object)
                 possible_indexes.append(i)
         if len(possible_circles) > 0:
@@ -371,8 +377,8 @@ class MapScene(BaseScene):
                     self.del_near_cursor_side()
                 elif event.button == 4 or event.button == 5:
                     playing = pygame.mixer.music.get_busy()
-                    mspb = 60000/float(self.map['bpm'])
-                    min_offset = float(self.map['offset'])%mspb
+                    mspb = 60000/float(self.bpm())
+                    min_offset = float(self.offset())%mspb
                     mspb /= self.divisor
                     music_pos = self.get_pos()
                     if event.button == 4:
@@ -403,7 +409,7 @@ class MapScene(BaseScene):
                     if arc_index > -1:
                         arc = self.map['objects'][arc_index]
                         initial_pos = convert_pos(Vector2(arc['pos']), self.height)+Vector2((self.width-self.height)/2, 0)
-                        self.object_preview = {'type':'track', 'start_time': arc['start_time']+arc['lifespan'], 'start_pos':tuple(initial_pos+Vector2(convert_scalar(arc['radius'], self.height), 0).rotate(-arc['angle'])), 'start_angle':-arc['angle']}
+                        self.object_preview = {'type':'track', 'radius':arc['radius'], 'initial_pos': initial_pos, 'start_time': arc['start_time']+arc['lifespan'], 'start_pos':tuple(initial_pos+Vector2(convert_scalar(arc['radius'], self.height), 0).rotate(-arc['angle'])), 'start_angle':-arc['angle']}
                 if event.key == K_r:
                     circle_index = self.get_closest_circle_index()
                     if circle_index > -1:
@@ -427,8 +433,8 @@ class MapScene(BaseScene):
                 if event.key == K_SPACE:
                     if pygame.mixer.music.get_busy():
 
-                        mspb = 60000/float(self.map['bpm'])
-                        min_offset = float(self.map['offset'])%mspb
+                        mspb = 60000/float(self.bpm())
+                        min_offset = float(self.offset())%mspb
                         mspb /= self.divisor
 
                         self.play_pos = max(0, min_offset+mspb*round((self.get_pos()-min_offset)/mspb))
@@ -470,11 +476,12 @@ class MapScene(BaseScene):
                     if hasattr(self, 'object_preview'):
                         start_pos = Vector2(self.object_preview['start_pos'])
                         start_angle = (self.object_preview['start_angle'])%360
+                        initial_pos = Vector2(self.object_preview['initial_pos'])
                         closest_circle = self.map['objects'][self.get_closest_circle_index()]
                         circle_pos = convert_pos(Vector2(closest_circle['pos']), self.height)+Vector2((self.width-self.height)/2, 0)
                         end_angle = (360/(4*self.anglesnap))*round(((Vector2(pygame.mouse.get_pos())-circle_pos).as_polar()[1])/(360/(4*self.anglesnap)))
-                        end_pos = circle_pos+Vector2(convert_scalar(closest_circle['radius'], self.height), 0).rotate(end_angle)
-                        
+                        # end_pos = circle_pos+Vector2(convert_scalar(closest_circle['radius'], self.height), 0).rotate(end_angle)
+                        end_pos = circle_pos
                         interfere_arc = False
                         for object in self.map['objects']:
                             if object['type'] == 'arc' and object['start_time']+object['lifespan'] == self.get_pos():
@@ -485,13 +492,15 @@ class MapScene(BaseScene):
                         if not interfere_arc and start_angle%180 != end_angle%180:
                             track = {}
                             track['type'] = 'track'
-                            track['start_pos'] = ((start_pos.x*2 - self.width) / self.height, (-start_pos.y*2 + self.height) / self.height)
+                            # track['start_pos'] = ((start_pos.x*2 - self.width) / self.height, (-start_pos.y*2 + self.height) / self.height)
+                            track['start_pos'] = ((initial_pos.x*2 - self.width) / self.height, (-initial_pos.y*2 + self.height) / self.height)
                             track['start_angle'] = start_angle
                             track['end_pos'] = ((end_pos.x*2 - self.width) / self.height, (-end_pos.y*2 + self.height) / self.height)
                             track['end_angle'] = end_angle
                             track['start_time'] = self.object_preview['start_time']
                             track['end_time'] = self.get_pos()
                             track['appear_time'] = self.approach()
+                            track['width'] = self.object_preview['radius']
                             self.add_object(track, self.get_pos())
 
                 if hasattr(self, 'object_preview'):
@@ -507,9 +516,8 @@ class MapScene(BaseScene):
         for field in self.fields:
             field.render(screen)
 
-
-        mspb = 60000/float(self.map['bpm'])
-        min_offset = float(self.map['offset'])%mspb
+        mspb = 60000/float(self.bpm())
+        min_offset = float(self.offset())%mspb
 
         num_beats = self.height//beat_size
 
@@ -547,8 +555,8 @@ class MapScene(BaseScene):
                     if cur_object['start_time']+cur_object['lifespan'] >= cur_beat and cur_object['start_time']+cur_object['lifespan'] < cur_beat+mspb:
                         y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']+cur_object['lifespan']-min_offset)%mspb)/mspb)/self.divisor
 
-                        point_a = (x_start+(x_end-x_start)/4, y_offset + y_offset_offset)
-                        point_b = (x_start+(x_end-x_start)*3/4, y_offset + y_offset_offset)
+                        point_a = (x_start, y_offset + y_offset_offset)
+                        point_b = (x_end, y_offset + y_offset_offset)
                         pygame.draw.line(screen, self.get_arc_color(k), point_a, point_b, 2)
 
                         self.side_objects.append({'type':'arc', 'a':point_a, 'b':point_b, 'index': k})
@@ -601,7 +609,7 @@ class MapScene(BaseScene):
                     obj.render(playfield)
             
             elif object['type'] == 'track' and object['start_time']-object['appear_time'] <= pos < object['end_time']:
-                obj = Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], self.arc_width())
+                obj = Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], object['width'])
                 obj.update(pos, True)
 
                 if obj.alive:
@@ -631,17 +639,20 @@ class MapScene(BaseScene):
             if self.object_preview['type'] == 'track':
                 start_pos = Vector2(self.object_preview['start_pos'])
                 start_angle = (self.object_preview['start_angle'])%360
+                initial_pos = Vector2(self.object_preview['initial_pos'])
                 closest_circle = self.map['objects'][self.get_closest_circle_index()]
                 circle_pos = convert_pos(Vector2(closest_circle['pos']), self.height)+Vector2((self.width-self.height)/2, 0)
                 end_angle = (360/(4*self.anglesnap))*round(((Vector2(pygame.mouse.get_pos())-circle_pos).as_polar()[1])/(360/(4*self.anglesnap)))
-                end_pos = circle_pos+Vector2(convert_scalar(closest_circle['radius'], self.height), 0).rotate(end_angle)
+                # end_pos = circle_pos+Vector2(convert_scalar(closest_circle['radius'], self.height), 0).rotate(end_angle)
+                end_pos = circle_pos
 
                 if start_angle%180 != end_angle%180:
-                    result = biarc_interpolator(start_pos, start_angle, end_pos, end_angle)
+                    result = biarc_interpolator(initial_pos, start_angle, end_pos, end_angle)
                     if result:
                         if result['c1']:
                             a1a = round(180-(Vector2(result['c1'])-Vector2(result['pm'])).as_polar()[1])%360
-                            a1b = round(180-(Vector2(result['c1'])-Vector2(start_pos)).as_polar()[1])%360
+                            a1b = round(180-(Vector2(result['c1'])-Vector2(initial_pos)).as_polar()[1])%360
+                            # a1b = round(180-(Vector2(result['c1'])-Vector2(start_pos)).as_polar()[1])%360
 
                             anglediff = (a1a-a1b + 180) % 360 - 180
                             if anglediff > 0:
@@ -672,8 +683,6 @@ class PlayScene(BaseScene):
         BaseScene.__init__(self)
 
         self.font = pygame.font.Font(resource_path(font_file), font_size)
-
-        # pygame.mouse.set_cursor(pygame.Cursor((32, 32), cursor_surf))
 
         self.cur_pos = pygame.mouse.get_pos()
         self.last_pos = self.cur_pos
@@ -715,8 +724,17 @@ class PlayScene(BaseScene):
         self.hit_indicators = []
 
         pygame.mouse.set_visible(False)
-
         pygame.mixer.music.play()
+
+    def bpm(self):
+        if 'bpm' in self.map:
+            return self.map['bpm']
+        return 120
+    
+    def offset(self):
+        if 'offset' in self.map:
+            return self.map['offset']
+        return 0
 
     def get_circle_color(self):
         col = get_color(self.circle_count)
@@ -727,6 +745,7 @@ class PlayScene(BaseScene):
         for obj in self.objects:
             if isinstance(obj, Circle) and object['start_time']+object['lifespan'] >= obj.start_time and object['start_time'] < obj.end_time and object['radius'] == obj.radius and object['pos'] == obj.pos:
                 return obj.color
+        return pygame.Color('white')
 
     def approach(self):
         return 200+float(self.map['approach'])*100
@@ -735,10 +754,9 @@ class PlayScene(BaseScene):
         return {'good': float(self.map['precision'])*10, 'ok': float(self.map['precision'])*20}
 
     def arc_width(self):
-        return float(self.map['width'])/20
+        return float(self.map['width'])/40
 
     def end_play(self):
-        # pygame.mouse.set_cursor(*pygame.cursors.arrow)
         pygame.mouse.set_visible(True)
 
     def break_combo(self):
@@ -780,7 +798,7 @@ class PlayScene(BaseScene):
                 self.objects.append(Arc(object['pos'], object['angle'], object['arc'], object['radius']+arc_distance, object['radius'], object['start_time'], self.approach(), self.hit_window(), self.get_arc_color(object)))
                 self.object_queue.pop(0)
             elif object['type'] == 'track' and object['start_time']-object['appear_time'] <= tick_time:
-                self.objects.append(Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], self.arc_width()))
+                self.objects.append(Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], object['width']))
                 self.object_queue.pop(0)
 
         for event in events:
