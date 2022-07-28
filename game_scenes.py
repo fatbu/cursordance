@@ -752,14 +752,22 @@ class PlayScene(BaseScene):
         if len(self.objects) > 0:
             last_tick_time = pygame.time.get_ticks()-self.last_tick
             first_hit_object = None
+            time_to_next = 0
             for i, object in enumerate(self.objects):
                 if isinstance(object, Arc) or isinstance(object, Track):
                     first_hit_object = object
+                    if isinstance(object, Arc) and i+1 < len(self.objects):
+                        next_obj = self.objects[i+1]
+                        if isinstance(object, Arc):
+                            time_to_next = next_obj.start_time - object.start_time
+                        elif isinstance(object, Track):
+                            time_to_next = next_obj.start_time - object.start_time - object.lifespan
                     break
             if first_hit_object:
                 hit_pos = None
                 hit_time = None
                 r = 0
+                track = False
                 if isinstance(first_hit_object, Arc):
                     center_pos = Vector2((self.width-self.height)/2, 0)+convert_pos(first_hit_object.pos, self.height)
                     r = convert_scalar(first_hit_object.end_radius, self.height)
@@ -770,7 +778,9 @@ class PlayScene(BaseScene):
                     hit_pos = hit_pos*self.height+Vector2((self.width-self.height)/2, 0)
                     r = first_hit_object.circle_radius*self.height/internal_res
 
-                    hit_time = last_tick_time+tick
+                    track = True
+
+                    hit_time = 1+tick
                 
                 hit_time = hit_time-tick
                 t = max(hit_time, 1)
@@ -779,25 +789,33 @@ class PlayScene(BaseScene):
 
                 v = 2*(s-0.5*self.cur_vel*t)/t
 
-                if v.magnitude() > s.magnitude():
-                    v.scale_to_length(s.magnitude())
-
-                self.cur_vel = self.cur_vel.lerp(v, 0.5)
+                if track:
+                    lerp_val = 0.5
+                else:
+                    time_to_next = max(time_to_next, 1)
+                    lerp_val = 1-min(1, t/time_to_next)
+                    lerp_val = lerp_val*lerp_val/math.sqrt(last_tick_time)
                 
+                self.cur_vel = self.cur_vel.lerp(v, lerp_val)
                 
-            else:
-                self.cur_vel = Vector2(0, 0)
     
             self.last_tick = pygame.time.get_ticks()
+
         self.cur_pos = self.cur_pos + self.cur_vel
-        if self.cur_pos.x < 0:
-            self.cur_pos.x = 0
-        if self.cur_pos.x > self.width:
-            self.cur_pos.x = self.width
+
+        if self.cur_pos.x < (self.width-self.height)/2:
+            self.cur_pos.x = (self.width-self.height)/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))/2
+        if self.cur_pos.x > (self.width+self.height)/2:
+            self.cur_pos.x = (self.width+self.height)/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))/2
         if self.cur_pos.y < 0:
             self.cur_pos.y = 0
-        if self.cur_pos.y > self.width:
-            self.cur_pos.y = self.width
+            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))/2
+        if self.cur_pos.y > self.height-1:
+            self.cur_pos.y = self.height-1
+            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))/2
+        
 
     def bpm(self):
         if 'bpm' in self.map:
