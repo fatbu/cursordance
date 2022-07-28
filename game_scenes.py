@@ -332,7 +332,7 @@ class MapScene(BaseScene):
         return 200+float(self.map['approach'])*100
 
     def hit_window(self):
-        return {'good': float(self.map['precision'])*10, 'ok': float(self.map['precision'])*20}
+        return {'good': float(self.map['precision'])*5, 'ok': float(self.map['precision'])*10}
 
     def arc_width(self):
         return float(self.map['width'])/40
@@ -750,8 +750,8 @@ class PlayScene(BaseScene):
 
     def auto_cursor(self, tick):
         if len(self.objects) > 0:
-            last_tick_time = pygame.time.get_ticks()-self.last_tick
             first_hit_object = None
+            last_tick_time = pygame.time.get_ticks()-self.last_tick
             time_to_next = 0
             for i, object in enumerate(self.objects):
                 if isinstance(object, Arc) or isinstance(object, Track):
@@ -766,7 +766,7 @@ class PlayScene(BaseScene):
             if first_hit_object:
                 hit_pos = None
                 hit_time = None
-                r = 0
+                # r = 0
                 track = False
                 if isinstance(first_hit_object, Arc):
                     center_pos = Vector2((self.width-self.height)/2, 0)+convert_pos(first_hit_object.pos, self.height)
@@ -776,28 +776,35 @@ class PlayScene(BaseScene):
                 else:
                     hit_pos = first_hit_object.circle_pos/internal_res
                     hit_pos = hit_pos*self.height+Vector2((self.width-self.height)/2, 0)
-                    r = first_hit_object.circle_radius*self.height/internal_res
+                    # r = first_hit_object.circle_radius*self.height/internal_res
 
                     track = True
 
                     hit_time = 1+tick
                 
-                hit_time = hit_time-tick
+                hit_time = abs(hit_time-tick)
                 t = max(hit_time, 1)
-                
+
                 s = hit_pos - self.cur_pos
 
-                v = 2*(s-0.5*self.cur_vel*t)/t
+                if s.magnitude() > 1:
+                    if track:
+                        self.cur_vel = s/2
+                    else:
+                        s.scale_to_length(s.magnitude()+2)
+                        self.cur_vel = s*last_tick_time/t
 
-                if track:
-                    lerp_val = 0.5
-                else:
-                    time_to_next = max(time_to_next, 1)
-                    lerp_val = 1-min(1, t/time_to_next)
-                    lerp_val = lerp_val*lerp_val/math.sqrt(last_tick_time)
-                
-                self.cur_vel = self.cur_vel.lerp(v, lerp_val)
-                
+                # if s.magnitude() > 1:
+                #     v = 2*(s-0.5*self.cur_vel*t)/t
+
+                    # if track:
+                    #     lerp_val = 0.5
+                    # else:
+                    #     lerp_val = 1-min(1, t/self.approach())
+                    #     lerp_val = lerp_val*lerp_val/1.5
+
+                    # self.cur_vel = self.cur_vel.lerp(v, lerp_val)
+                    # self.cur_vel = v
     
             self.last_tick = pygame.time.get_ticks()
 
@@ -805,16 +812,24 @@ class PlayScene(BaseScene):
 
         if self.cur_pos.x < (self.width-self.height)/2:
             self.cur_pos.x = (self.width-self.height)/2
-            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))
+            if self.cur_vel.magnitude() > 0:
+                self.cur_vel.scale_to_length(math.sqrt(self.cur_vel.magnitude()))
         if self.cur_pos.x > (self.width+self.height)/2:
             self.cur_pos.x = (self.width+self.height)/2
-            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(1, 0))
+            if self.cur_vel.magnitude() > 0:
+                self.cur_vel.scale_to_length(math.sqrt(self.cur_vel.magnitude()))
         if self.cur_pos.y < 0:
             self.cur_pos.y = 0
-            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))
+            if self.cur_vel.magnitude() > 0:
+                self.cur_vel.scale_to_length(math.sqrt(self.cur_vel.magnitude()))
         if self.cur_pos.y > self.height-1:
             self.cur_pos.y = self.height-1
-            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))/2
+            self.cur_vel = self.cur_vel.reflect(Vector2(0, 1))
+            if self.cur_vel.magnitude() > 0:
+                self.cur_vel.scale_to_length(math.sqrt(self.cur_vel.magnitude()))
         
 
     def bpm(self):
@@ -842,7 +857,7 @@ class PlayScene(BaseScene):
         return 200+float(self.map['approach'])*100
 
     def hit_window(self):
-        return {'good': float(self.map['precision'])*10, 'ok': float(self.map['precision'])*20}
+        return {'good': float(self.map['precision'])*5, 'ok': float(self.map['precision'])*10}
 
     def arc_width(self):
         return float(self.map['width'])/40
