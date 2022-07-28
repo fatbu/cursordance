@@ -45,86 +45,88 @@ def line_intersection(line1, line2):
 
 # https://www.ryanjuckett.com/biarc-interpolation/
 def biarc_interpolator(point1, angle1, point2, angle2):
-    def z(a, b):
-        return a.x*b.y-a.y-b.x
+    try:
+        def z(a, b):
+            return a.x*b.y-a.y-b.x
 
-    vector1 = Vector2(1, 0).rotate(angle1)
-    vector2 = Vector2(1, 0).rotate(angle2)
+        vector1 = Vector2(1, 0).rotate(angle1)
+        vector2 = Vector2(1, 0).rotate(angle2)
 
-    if angle1%180 == angle2%180:
-        return False
+        if angle1%180 == angle2%180:
+            return False
 
-    p1 = Vector2(point1)
-    p2 = Vector2(point2)
-    
-    intersect = line_intersection((p1, p1+vector1), (p2, p2+vector2))
-    
-    intersect = Vector2(intersect)
+        p1 = Vector2(point1)
+        p2 = Vector2(point2)
+        
+        intersect = line_intersection((p1, p1+vector1), (p2, p2+vector2))
+        
+        intersect = Vector2(intersect)
 
-    t1 = (intersect-p1).normalize()
-    t2 = (intersect-p2).normalize()
+        t1 = (intersect-p1).normalize()
+        t2 = (intersect-p2).normalize()
 
-    if t1.magnitude() == 0 or t2.magnitude() == 0:
-        return False
+        if t1.magnitude() == 0 or t2.magnitude() == 0:
+            return False
 
-    t = t1+t2
-    v = p2-p1
+        t = t1+t2
+        v = p2-p1
 
-    d = 0
-    dn = (2*(1-t1.dot(t2)))
-    if dn != 0:
-        d = (-v.dot(t)+math.sqrt(v.dot(t)*v.dot(t)+2*(1-t1.dot(t2))*v.dot(v)))/dn
-    else:
-        dn = 4*v.dot(t2)
-        d = v.dot(v)/dn
-    
-    pm = (p1+p2+d*(t1-t2))/2
-
-    n1 = Vector2(-t1.y, t1.x)
-    n2 = Vector2(-t2.y, t2.x)
-    dn1 = 2*n1.dot(pm-p1)
-    dn2 = 2*n2.dot(pm-p2)
-    c1 = False
-    o1 = False
-    if dn1 != 0:
-        c1 = p1+n1*(pm-p1).dot(pm-p1)/dn1
-        r1 = abs((pm-p1).dot(pm-p1)/dn1)
-        op1 = (p1-c1)/r1
-        om1 = (pm-c1)/r1
-        zval = z(op1, om1)
-        if zval > 0:
-            o1 = math.degrees(math.acos(op1.dot(om1)))
+        d = 0
+        dn = (2*(1-t1.dot(t2)))
+        if dn != 0:
+            d = (-v.dot(t)+math.sqrt(v.dot(t)*v.dot(t)+2*(1-t1.dot(t2))*v.dot(v)))/dn
         else:
-            o1 = -math.degrees(math.acos(op1.dot(om1)))
-    c2 = False
-    o2 = False
-    if dn2 != 0:
-        c2 = p2+n2*(pm-p2).dot(pm-p2)/dn2
-        r2 = abs((pm-p2).dot(pm-p2)/dn2)
-        op2 = (p2-c2)/r2
-        om2 = (pm-c2)/r2
-        zval = z(op2, om2)
-        if zval > 0:
-            o2 = math.degrees(math.acos(op2.dot(om2)))
+            dn = 4*v.dot(t2)
+            d = v.dot(v)/dn
+        
+        pm = (p1+p2+d*(t1-t2))/2
+
+        n1 = Vector2(-t1.y, t1.x)
+        n2 = Vector2(-t2.y, t2.x)
+        dn1 = 2*n1.dot(pm-p1)
+        dn2 = 2*n2.dot(pm-p2)
+        c1 = False
+        o1 = False
+        if dn1 != 0:
+            c1 = p1+n1*(pm-p1).dot(pm-p1)/dn1
+            r1 = abs((pm-p1).dot(pm-p1)/dn1)
+            op1 = (p1-c1)/r1
+            om1 = (pm-c1)/r1
+            zval = z(op1, om1)
+            if zval > 0:
+                o1 = math.degrees(math.acos(op1.dot(om1)))
+            else:
+                o1 = -math.degrees(math.acos(op1.dot(om1)))
+        c2 = False
+        o2 = False
+        if dn2 != 0:
+            c2 = p2+n2*(pm-p2).dot(pm-p2)/dn2
+            r2 = abs((pm-p2).dot(pm-p2)/dn2)
+            op2 = (p2-c2)/r2
+            om2 = (pm-c2)/r2
+            zval = z(op2, om2)
+            if zval > 0:
+                o2 = math.degrees(math.acos(op2.dot(om2)))
+            else:
+                o2 = -math.degrees(math.acos(op2.dot(om2)))
+        ret = {}
+
+        ret['pm'] = tuple(pm)
+
+        if c1:
+            ret['c1'] = tuple(c1)
+            ret['o1'] = o1
         else:
-            o2 = -math.degrees(math.acos(op2.dot(om2)))
-    ret = {}
+            ret['c1'] = False
+        if c2:
+            ret['c2'] = tuple(c2)
+            ret['o2'] = o2
+        else:
+            ret['c2'] = False
 
-    ret['pm'] = tuple(pm)
-
-    if c1:
-        ret['c1'] = tuple(c1)
-        ret['o1'] = o1
-    else:
-        ret['c1'] = False
-    if c2:
-        ret['c2'] = tuple(c2)
-        ret['o2'] = o2
-    else:
-        ret['c2'] = False
-
-    return ret
-    
+        return ret
+    except:
+        return False
     
 
 

@@ -1,4 +1,3 @@
-from cv2 import resize
 import pygame
 import math
 from pygame.math import *
@@ -7,6 +6,7 @@ from pygame.constants import *
 
 glow_radius = 8
 glow_step = 1
+glow_stack = 1
 internal_res = 256
 
 blend_mode = BLEND_ADD
@@ -59,13 +59,12 @@ class Circle(GameObject):
         super().__init__()
         self.pos = Vector2(pos)
         self.radius = radius
-        self.cur_radius = 0
         self.color = color
         self.appear_time = appear_time
         self.start_time = start_time
         self.end_time = end_time
         self.fade = 0
-
+        self.cur_opacity = 0
         surf_size = convert_scalar(self.radius, internal_res)*2+glow_radius*2
         self.surf = pygame.Surface((surf_size, surf_size))
         self.surf.set_colorkey((0, 0, 0))
@@ -76,19 +75,23 @@ class Circle(GameObject):
             opacity_surf.set_alpha(255//(max(1, i)**2))
             pygame.draw.circle(opacity_surf, self.color, (opacity_surf.get_width()/2, opacity_surf.get_height()/2), convert_scalar(self.radius, internal_res)+i, max(1, i)*2)
             self.surf.blit(opacity_surf, (0, 0))
+        for i in range(glow_stack):
+            self.surf.blit(self.surf, (0, 0), special_flags=blend_mode)
     def update(self, tick, map_mode = False):
-        if tick < self.start_time-self.appear_time and map_mode:
+        if tick <= self.start_time-self.appear_time and map_mode:
             self.die()
             return
-        elif tick > self.end_time+self.appear_time:
+        elif tick >= self.end_time+self.appear_time:
             self.die()
             return
         else:
             self.live()
+        if tick < self.start_time - self.appear_time:
+            return
         if tick < self.start_time:
-            self.cur_radius = lerp(self.radius, 0, (self.start_time-tick)/self.appear_time)
+            self.cur_opacity = quadscale((self.start_time-tick)/self.appear_time)
         elif tick >= self.start_time:
-            self.cur_radius = self.radius
+            self.cur_opacity = 1
         
         if tick >= self.end_time:
             self.fade = quadscale(min(1, lerp(0, 1, (tick-self.end_time)/self.appear_time)))
@@ -97,7 +100,7 @@ class Circle(GameObject):
         # elif tick > self.end_time:
         #     self.cur_radius = lerp(self.radius, 0, (tick-self.end_time)/self.expand_time)
     def render(self, surf):
-        if self.cur_radius == self.radius and self.fade == 0:
+        if self.cur_opacity == 1 and self.fade == 0:
             # surf_size = convert_scalar(self.radius, surf.get_height())*2+glow_radius*2
             # pygame.draw.circle(surf, self.color, convert_pos(self.pos, surf.get_height()), convert_scalar(self.cur_radius, surf.get_height()), 2)
             # opacity_surf = pygame.Surface((surf_size, surf_size)) 
@@ -144,16 +147,12 @@ class Circle(GameObject):
             #     pygame.draw.circle(opacity_surf, self.color, (opacity_surf.get_width()/2, opacity_surf.get_height()/2), convert_scalar(self.cur_radius, surf.get_height())+i, i*2)
             #     surf.blit(opacity_surf, convert_pos(self.pos, surf.get_height())+Vector2(-surf_size/2, -surf_size/2))
             # self.surf.set_alpha(255*self.cur_radius/self.radius)
-            resize_size = convert_scalar(self.cur_radius, surf.get_height())*2+glow_radius*2
             darken_surf = self.surf.copy()
-            resized_surf = pygame.transform.smoothscale(self.surf, (resize_size, resize_size)).convert_alpha()
             surf_size = surf.get_height()
             darkener = pygame.Surface((surf_size, surf_size))
-            darkener.set_alpha(255-255*quadscale(self.cur_radius/self.radius))
-            resized_surf.blit(darkener, (0, 0))
+            darkener.set_alpha(255*self.cur_opacity)
             darken_surf.blit(darkener, (0, 0))
             surf.blit(darken_surf, convert_pos(self.pos, surf_size)+Vector2(-self.surf.get_width()/2, -self.surf.get_height()/2), special_flags=blend_mode)
-            surf.blit(resized_surf, convert_pos(self.pos, surf_size)+Vector2(-resized_surf.get_width()/2, -resized_surf.get_height()/2), special_flags=blend_mode)
 class Arc(GameObject):
     def __init__(self, pos, angle, arc, start_radius, radius, start_time, lifespan, hit_window, color, hidden = False):
         super().__init__()
@@ -213,6 +212,10 @@ class Arc(GameObject):
         self.line_pos = line_area.topleft
         self.line_surf = pygame.Surface(line_area.size)
         self.line_surf.blit(line_surf, (0, 0), area=line_area)
+
+        for i in range(glow_stack):
+            self.draw_surf.blit(self.draw_surf, (0, 0), special_flags=blend_mode)
+            self.line_surf.blit(self.line_surf, (0, 0), special_flags=blend_mode)
     def update(self, tick, map_mode = False):
         self.ttl = self.start_time+self.lifespan-tick
         self.radius = lerp(self.start_radius, self.end_radius, (self.lifespan-self.ttl)/self.lifespan)
@@ -300,10 +303,9 @@ class Track(GameObject):
         # self.angle2b = angle2b
         self.arc_count = 1
         self.opacity = 0
+        self.hit_time = 0
 
         self.surf = pygame.Surface((internal_res, internal_res))
-
-
         result = biarc_interpolator(self.start_pos, self.start_angle, self.end_pos, self.end_angle)
 
         a1a = round(180-(Vector2(result['c1'])-Vector2(result['pm'])).as_polar()[1])%360
@@ -371,6 +373,11 @@ class Track(GameObject):
         self.circle_surf = circle_surf
         self.circle_pos = self.start_pos
         self.circle_radius = convert_scalar(circle_radius, internal_res)
+
+        for i in range(glow_stack):
+            self.surf.blit(self.surf, (0, 0), special_flags=blend_mode)
+            self.circle_surf.blit(self.circle_surf, (0, 0), special_flags=blend_mode)
+
     def update(self, tick, map_mode = False):
         if tick < self.start_time-self.appear_time and map_mode:
             self.die()
@@ -391,21 +398,27 @@ class Track(GameObject):
             # else:
                 # self.opacity = 1
             self.opacity = 1
+
+                    
+        if self.hit_time or map_mode:
+            if map_mode:
+                if tick < self.start_time:
+                    return
+                self.hit_time = self.start_time
+
             if self.arc_count == 1:
                 anglediff = (180+self.arc1start-self.arc1end)%360-180
-                self.circle_pos = self.arc1pos+Vector2(self.arc1radius, 0).rotate(-self.arc1start+lerp(0, anglediff, (tick-self.start_time)/(self.end_time-self.start_time)))
+                self.circle_pos = self.arc1pos+Vector2(self.arc1radius, 0).rotate(-self.arc1start+lerp(0, anglediff, (tick-self.hit_time)/(self.end_time-self.hit_time)))
             elif self.arc_count == 2:
                 anglediff1 = (180+self.arc1start-self.arc1end)%360-180
                 anglediff2 = (180+self.arc2start-self.arc2end)%360-180
                 arc1length = self.arc1radius*abs(anglediff1)
                 arc2length = self.arc2radius*abs(anglediff2)
-                arc_cutoff = lerp(self.start_time, self.end_time, arc1length/(arc1length+arc2length))
+                arc_cutoff = lerp(self.hit_time, self.end_time, arc1length/(arc1length+arc2length))
                 if tick < arc_cutoff:
-                    self.circle_pos = self.arc1pos+Vector2(self.arc1radius, 0).rotate(-self.arc1start+lerp(0, anglediff1, 1-(arc_cutoff-tick)/(arc_cutoff-self.start_time)))
+                    self.circle_pos = self.arc1pos+Vector2(self.arc1radius, 0).rotate(-self.arc1start+lerp(0, anglediff1, 1-(arc_cutoff-tick)/(arc_cutoff-self.hit_time)))
                 else:
                     self.circle_pos = self.arc2pos+Vector2(self.arc2radius, 0).rotate(-self.arc2start+lerp(0, anglediff2, 1-(tick-arc_cutoff)/(self.end_time-arc_cutoff)))
-                    
-
 
     def render(self, surf):
         if self.opacity < 1:

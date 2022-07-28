@@ -1,4 +1,3 @@
-from re import U
 import tkinter
 import tkinter.filedialog
 import pygame
@@ -9,10 +8,13 @@ import pygame_textinput
 from pydub import AudioSegment
 from utils import *
 import sys
+import pygame_textinput
+import json
 
 cursor_size = 64
 cursor_surf = pygame.Surface((cursor_size, cursor_size))
-cursor_surf.set_colorkey((0, 0, 0))
+cursor_surf.fill((1, 1, 1))
+cursor_surf.set_colorkey((1, 1, 1))
 pygame.draw.circle(cursor_surf, (255, 255, 255), (cursor_size/2, cursor_size/2), cursor_size/2, 0)
 pygame.draw.circle(cursor_surf, (0, 0, 0), (cursor_size/2, cursor_size/2), cursor_size*7/16, cursor_size//8)
 
@@ -20,8 +22,6 @@ trail_time = 250
 cursor_trail = pygame.Surface((8, 8))
 cursor_trail.set_colorkey((0, 0, 0))
 pygame.draw.circle(cursor_trail, pygame.Color('white'), (4, 4), 4, 0)
-
-
 
 font_size = 32
 font_file = 'fonts/Pixolletta8px.ttf'
@@ -121,9 +121,6 @@ class TestScene(BaseScene):
         pygame.draw.rect(screen, pygame.Color('white'), ((self.width-self.height)/2, 0, self.height, self.height), 4)
 
 
-import pygame_textinput
-import pickle
-
 class InputField:
     def __init__(self, label, font, pos):
         self.font = font
@@ -158,7 +155,7 @@ class InputField:
         return self.input_box.value
 
 class MapScene(BaseScene):
-    def __init__(self, file_path = None):
+    def __init__(self, file_path = None, start_pos = 0):
         BaseScene.__init__(self)
         self.last_pos = pygame.mouse.get_pos()
         self.objects = []
@@ -181,17 +178,17 @@ class MapScene(BaseScene):
         self.music_file_path = ''
         self.map_file_path = ''
 
-        if file_path[-4:] == '.map':
-            self.music_file_path = file_path[:-4]
+        if file_path[-5:] == '.json':
+            self.music_file_path = file_path[:-5]
             self.map_file_path = file_path
         else:
             self.music_file_path = file_path
-            self.map_file_path = self.music_file_path+'.map'
+            self.map_file_path = self.music_file_path+'.json'
 
         if self.music_file_path[-4:] != '.ogg':
             audio_file = AudioSegment.from_file(self.music_file_path)
             self.music_file_path = self.music_file_path[:-4]+'.ogg'
-            self.map_file_path = self.music_file_path[:-4]+'.ogg.map'
+            self.map_file_path = self.music_file_path[:-4]+'.ogg.json'
             audio_file.export(self.music_file_path, format='ogg')
             
 
@@ -202,9 +199,14 @@ class MapScene(BaseScene):
 
         pygame.mixer.music.load(self.music_file_path)
 
+        if start_pos:
+            self.play_pos = start_pos*1000
+            pygame.mixer.music.play(start=start_pos)
+            pygame.mixer.music.pause()
+
         try:
-            with open(self.map_file_path, 'rb+') as map_file:
-                self.map = pickle.load(map_file)
+            with open(self.map_file_path, 'r+') as map_file:
+                self.map = json.load(map_file)
         except:
             self.map = {}
             open(self.map_file_path, 'x').close()
@@ -255,8 +257,8 @@ class MapScene(BaseScene):
         if 'objects' in self.map:
             self.map['objects'].sort(key=self.get_object_time)
 
-        with open(self.map_file_path, 'rb+') as map_file:
-            pickle.dump(self.map, map_file)
+        with open(self.map_file_path, 'r+') as map_file:
+            json.dump(self.map, map_file)
     
     def add_object(self, obj, time):
         if len(self.map['objects']) > 0:
@@ -442,9 +444,14 @@ class MapScene(BaseScene):
                         pygame.mixer.music.stop()
                     else:
                         pygame.mixer.music.play(start=self.play_pos/1000)
+                if event.key == K_t:
+                    if self.divisor == 4:
+                        self.divisor = 6
+                    else:
+                        self.divisor = 4
                 if event.key == K_p:
                     self.save()
-                    self.next = PlayScene(self.map_file_path)
+                    self.next = PlayScene(self.map_file_path, start_pos=self.play_pos/1000, auto=ctrl_pressed)
             if event.type == KEYUP:
                 if event.key == K_w:
                     circle_obj = self.object_preview
@@ -532,10 +539,6 @@ class MapScene(BaseScene):
             for j in range(1, self.divisor):
                 pygame.draw.line(screen, pygame.Color('grey30'), (x_start, beat_size*j/self.divisor+y_offset), (x_end-(x_end-x_start)/2, beat_size*j/self.divisor+y_offset), 1)
 
-
-        pygame.draw.line(screen, pygame.Color('white'), (x_start, self.height/2), (x_end, self.height/2), 2)
-
-
         for i in range(-num_beats, num_beats):
             y_offset = y_mid + i * beat_size - beat_size*((pos-min_offset)%mspb)/mspb
             cur_beat = min_offset+mspb*math.floor((pos-min_offset)/mspb)+i*mspb
@@ -544,7 +547,8 @@ class MapScene(BaseScene):
                 cur_object = self.map['objects'][k]
                 if cur_object['type'] == 'circle':
                     if cur_object['start_time'] >= cur_beat and cur_object['start_time'] < cur_beat+mspb:
-                        y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']-min_offset)%mspb)/mspb)/self.divisor
+                        # y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']-min_offset)%mspb)/mspb)/self.divisor
+                        y_offset_offset = beat_size*((cur_object['start_time']-min_offset)%mspb)/mspb
                         circle_pos = ((x_start+x_end)/2, y_offset + y_offset_offset)
                         circle_radius = beat_size/(self.divisor*2)
                         pygame.draw.circle(screen, self.get_circle_color(k), circle_pos, circle_radius, 2)
@@ -553,8 +557,8 @@ class MapScene(BaseScene):
 
                 elif cur_object['type'] == 'arc':
                     if cur_object['start_time']+cur_object['lifespan'] >= cur_beat and cur_object['start_time']+cur_object['lifespan'] < cur_beat+mspb:
-                        y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']+cur_object['lifespan']-min_offset)%mspb)/mspb)/self.divisor
-
+                        # y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']+cur_object['lifespan']-min_offset)%mspb)/mspb)/self.divisor
+                        y_offset_offset = beat_size*((cur_object['start_time']+cur_object['lifespan']-min_offset)%mspb)/mspb
                         point_a = (x_start, y_offset + y_offset_offset)
                         point_b = (x_end, y_offset + y_offset_offset)
                         pygame.draw.line(screen, self.get_arc_color(k), point_a, point_b, 2)
@@ -563,7 +567,8 @@ class MapScene(BaseScene):
 
                 elif cur_object['type'] == 'track':
                     if cur_object['start_time'] >= cur_beat and cur_object['start_time'] < cur_beat+mspb:
-                        y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']-min_offset)%mspb)/mspb)/self.divisor
+                        # y_offset_offset = beat_size*round(self.divisor*((cur_object['start_time']-min_offset)%mspb)/mspb)/self.divisor
+                        y_offset_offset = beat_size*((cur_object['start_time']-min_offset)%mspb)/mspb
                         line_length = beat_size*(cur_object['end_time']-cur_object['start_time'])/mspb
 
                         point_a = (x_start+(x_end-x_start)/2, y_offset + y_offset_offset)
@@ -572,9 +577,12 @@ class MapScene(BaseScene):
 
                         self.side_objects.append({'type':'track', 'a':point_a, 'b':point_b, 'index': k })
 
+        pygame.draw.line(screen, pygame.Color('white'), (x_start, self.height/2), ((x_start+x_end)/2, self.height/2), 2)
+
         line_length = self.get_pos()*self.height/self.duration
         pygame.draw.rect(screen, pygame.Color('white'), (x_end, 0, 16, line_length), 0)
         pygame.draw.rect(screen, pygame.Color('white'), (x_end, 0, 16, self.height), 1)
+
 
 
         play_time = str(self.get_pos())+'/'+str(int(self.duration))
@@ -612,6 +620,10 @@ class MapScene(BaseScene):
                 obj = Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], object['width'])
                 obj.update(pos, True)
 
+                if pygame.mixer.music.get_busy() and abs(obj.end_time - self.get_pos()) < map_hit and abs(self.get_pos() - self.last_hit) > map_hit*2:
+                    pygame.mixer.Sound.play(hit_sound)
+                    self.last_hit = self.get_pos()
+                
                 if obj.alive:
                     obj.render(playfield)
 
@@ -679,7 +691,7 @@ class MapScene(BaseScene):
 
 
 class PlayScene(BaseScene):
-    def __init__(self, file_path):
+    def __init__(self, file_path, start_pos=0, auto = False):
         BaseScene.__init__(self)
 
         self.font = pygame.font.Font(resource_path(font_file), font_size)
@@ -706,34 +718,95 @@ class PlayScene(BaseScene):
         self.music_file_path = ''
         self.map_file_path = ''
 
-        if file_path[-4:] == '.map':
-            self.music_file_path = file_path[:-4]
+        if file_path[-5:] == '.json':
+            self.music_file_path = file_path[:-5]
             self.map_file_path = file_path
         else:
             self.music_file_path = file_path
-            self.map_file_path = self.music_file_path+'.map'
+            self.map_file_path = self.music_file_path+'.json'
 
         self.duration = pygame.mixer.Sound(self.music_file_path).get_length()*1000
         pygame.mixer.music.load(self.music_file_path)
 
-        with open(self.map_file_path, 'rb') as map_file:
-            self.map = pickle.load(map_file)
+        with open(self.map_file_path, 'r') as map_file:
+            self.map = json.load(map_file)
 
         self.object_queue = self.map['objects']
         
         self.hit_indicators = []
 
-        pygame.mouse.set_visible(False)
-        pygame.mixer.music.play()
+        self.auto = auto
+        if not auto:
+            pygame.mouse.set_visible(False)
+        else:
+            self.cur_pos = Vector2(self.width/2, self.height/2)
+            self.cur_vel = Vector2(0, 0)
+            self.last_tick = pygame.time.get_ticks()
+
+        self.song_pos = start_pos*1000
+        self.start_pos = start_pos
+
+        pygame.mixer.music.play(start=start_pos)
+
+    def auto_cursor(self, tick):
+        if len(self.objects) > 0:
+            last_tick_time = pygame.time.get_ticks()-self.last_tick
+            first_hit_object = None
+            for i, object in enumerate(self.objects):
+                if isinstance(object, Arc) or isinstance(object, Track):
+                    first_hit_object = object
+                    break
+            if first_hit_object:
+                hit_pos = None
+                hit_time = None
+                r = 0
+                if isinstance(first_hit_object, Arc):
+                    center_pos = Vector2((self.width-self.height)/2, 0)+convert_pos(first_hit_object.pos, self.height)
+                    r = convert_scalar(first_hit_object.end_radius, self.height)
+                    hit_pos = center_pos+Vector2(r, 0).rotate(-first_hit_object.angle)
+                    hit_time = first_hit_object.start_time+first_hit_object.lifespan
+                else:
+                    hit_pos = first_hit_object.circle_pos/internal_res
+                    hit_pos = hit_pos*self.height+Vector2((self.width-self.height)/2, 0)
+                    r = first_hit_object.circle_radius*self.height/internal_res
+
+                    hit_time = last_tick_time+tick
+                
+                hit_time = hit_time-tick
+                t = max(hit_time, 1)
+                
+                s = hit_pos - self.cur_pos
+
+                v = 2*(s-0.5*self.cur_vel*t)/t
+
+                if v.magnitude() > s.magnitude():
+                    v.scale_to_length(s.magnitude())
+
+                self.cur_vel = self.cur_vel.lerp(v, 0.5)
+                
+                
+            else:
+                self.cur_vel = Vector2(0, 0)
+    
+            self.last_tick = pygame.time.get_ticks()
+        self.cur_pos = self.cur_pos + self.cur_vel
+        if self.cur_pos.x < 0:
+            self.cur_pos.x = 0
+        if self.cur_pos.x > self.width:
+            self.cur_pos.x = self.width
+        if self.cur_pos.y < 0:
+            self.cur_pos.y = 0
+        if self.cur_pos.y > self.width:
+            self.cur_pos.y = self.width
 
     def bpm(self):
         if 'bpm' in self.map:
-            return self.map['bpm']
+            return float(self.map['bpm'])
         return 120
     
     def offset(self):
         if 'offset' in self.map:
-            return self.map['offset']
+            return float(self.map['offset'])
         return 0
 
     def get_circle_color(self):
@@ -762,6 +835,10 @@ class PlayScene(BaseScene):
     def break_combo(self):
         self.combo = 0
 
+    def skip_to(self, song_pos):
+        self.song_pos = song_pos
+        pygame.mixer.music.play(start=self.song_pos/1000)
+
     def update_stats(self, result):
         if result > 0:
             self.score += result*min(self.combo, 100)
@@ -775,9 +852,12 @@ class PlayScene(BaseScene):
             self.combo = 0 
 
     def update(self, events):
-        tick_time = pygame.mixer.music.get_pos()
+        tick_time = self.song_pos + pygame.mixer.music.get_pos()
 
-        self.cur_pos = pygame.mouse.get_pos()
+        if not self.auto:
+            self.cur_pos = pygame.mouse.get_pos()
+        else:
+            self.auto_cursor(tick_time)
 
         self.mouse_trail.append((tick_time, self.cur_pos))
         while self.mouse_trail[0][0] < tick_time - trail_time:
@@ -785,27 +865,32 @@ class PlayScene(BaseScene):
 
 
         if len(self.objects) == 0 and len(self.object_queue) == 0:
-            self.next = MapScene(self.file_path)
+            self.next = MapScene(self.file_path, start_pos=self.start_pos)
             self.end_play()
             return
 
         if len(self.object_queue):
             object = self.object_queue[0]
-            if object['type'] == 'circle' and object['start_time']-object['appear_time'] <= tick_time:
+            if object['type'] == 'circle' and object['start_time']-object['appear_time'] < tick_time:
                 self.objects.append(Circle(object['pos'], object['radius'], object['appear_time'], object['start_time'], object['end_time'], self.get_circle_color()))
                 self.object_queue.pop(0)
-            elif object['type'] == 'arc' and object['start_time'] <= tick_time:
+            elif object['type'] == 'arc' and object['start_time'] < tick_time:
                 self.objects.append(Arc(object['pos'], object['angle'], object['arc'], object['radius']+arc_distance, object['radius'], object['start_time'], self.approach(), self.hit_window(), self.get_arc_color(object)))
                 self.object_queue.pop(0)
-            elif object['type'] == 'track' and object['start_time']-object['appear_time'] <= tick_time:
+            elif object['type'] == 'track' and object['start_time']-object['appear_time'] < tick_time:
                 self.objects.append(Track(object['start_time'], object['appear_time'], object['end_time'], object['start_pos'], object['start_angle'], object['end_pos'], object['end_angle'], object['width']))
                 self.object_queue.pop(0)
 
         for event in events:
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
-                    self.next = MapScene(self.file_path)
+                    self.next = MapScene(self.file_path, start_pos=self.start_pos)
                     self.end_play()
+                if event.key == K_SPACE:
+                    if len(self.object_queue):
+                        skip_time = self.object_queue[0]['start_time']-60000*4/self.bpm()
+                        if tick_time < skip_time:
+                            self.skip_to(skip_time)
 
             # if event.type == MOUSEMOTION:
             #     if event.pos != self.cur_pos:
@@ -830,6 +915,11 @@ class PlayScene(BaseScene):
                 result = object.check_hit(cur_pos)
                 if result < 0:
                     self.break_combo()
+                elif object.hit_time == 0:
+                    object.hit_time = tick_time
+                elif not object.alive:
+                    pygame.mixer.Sound.play(hit_sound)
+
                 first_obj = False
 
             if object.alive:
