@@ -742,7 +742,6 @@ class PlayScene(BaseScene):
             self.cur_pos = Vector2(self.width/2, self.height/2)
             self.cur_vel = Vector2(0, 0)
             self.last_tick = pygame.time.get_ticks()
-
         self.song_pos = start_pos*1000
         self.start_pos = start_pos
 
@@ -752,16 +751,9 @@ class PlayScene(BaseScene):
         if len(self.objects) > 0:
             first_hit_object = None
             last_tick_time = pygame.time.get_ticks()-self.last_tick
-            time_to_next = 0
             for i, object in enumerate(self.objects):
                 if isinstance(object, Arc) or isinstance(object, Track):
                     first_hit_object = object
-                    if isinstance(object, Arc) and i+1 < len(self.objects):
-                        next_obj = self.objects[i+1]
-                        if isinstance(object, Arc):
-                            time_to_next = next_obj.start_time - object.start_time
-                        elif isinstance(object, Track):
-                            time_to_next = next_obj.start_time - object.start_time - object.lifespan
                     break
             if first_hit_object:
                 hit_pos = None
@@ -887,13 +879,16 @@ class PlayScene(BaseScene):
     def update(self, events):
         tick_time = self.song_pos + pygame.mixer.music.get_pos()
 
-        if not self.auto:
-            self.cur_pos = pygame.mouse.get_pos()
-        else:
+        # if not self.auto:
+        #     self.cur_pos = pygame.mouse.get_pos()
+        # else:
+        #     self.auto_cursor(tick_time)
+        if self.auto:
             self.auto_cursor(tick_time)
 
-        self.mouse_trail.append((tick_time, self.cur_pos))
-        while self.mouse_trail[0][0] < tick_time - trail_time:
+
+        # self.mouse_trail.append((tick_time, self.cur_pos))
+        while len(self.mouse_trail) and self.mouse_trail[0][0] < tick_time - trail_time:
             self.mouse_trail.pop(0)
 
 
@@ -925,9 +920,9 @@ class PlayScene(BaseScene):
                         if tick_time < skip_time:
                             self.skip_to(skip_time)
 
-            # if event.type == MOUSEMOTION:
-            #     if event.pos != self.cur_pos:
-            #         self.cur_pos = event.pos
+            if event.type == MOUSEMOTION:
+                self.mouse_trail.append((tick_time, event.pos))
+                self.cur_pos = event.pos
         keep_objects = []
         first_obj = True
         cur_pos = ((self.cur_pos[0]*2-self.width)/self.height, -(self.cur_pos[1]*2-self.height)/self.height)
